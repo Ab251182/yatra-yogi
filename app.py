@@ -16,10 +16,23 @@ def fetch_youtube_videos(query):
         "type": "video"
     }
 
+   def fetch_youtube_videos(query):
+    search_url = "https://www.googleapis.com/youtube/v3/search"
+    search_params = {
+        "part": "snippet",
+        "q": query,
+        "key": youtube_api_key,
+        "maxResults": 10,
+        "type": "video"
+    }
+
     response = requests.get(search_url, params=search_params)
     data = response.json()
-    items = data.get("items", [])
 
+    # 🔍 Add this line to debug
+    st.write("🔍 YouTube API raw response:", data)
+
+    items = data.get("items", [])
     videos = []
     for item in items:
         videos.append({
@@ -27,6 +40,7 @@ def fetch_youtube_videos(query):
             "description": item["snippet"]["description"]
         })
     return videos
+
 
 def summarize_video(title, description):
     prompt = f"Summarize this travel video:\nTitle: {title}\nDescription: {description}"
