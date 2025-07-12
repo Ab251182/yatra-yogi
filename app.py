@@ -1,22 +1,18 @@
 import streamlit as st
-import openai
 import requests
+from transformers import pipeline
 
-# ✅ Load API keys from Streamlit secrets
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-youtube_api_key = st.secrets["YOUTUBE_API_KEY"]
+# ✅ Load Hugging Face summarizer pipeline
+summarizer = pipeline("summarization")
 
-# ✅ Debug check - shows message if OpenAI key loads
-st.write("🔑 OpenAI Key Loaded")
-
-# ✅ Function to fetch videos from YouTube
-def fetch_youtube_videos(query):
+# ✅ Function to fetch YouTube videos
+def fetch_youtube_videos(query, youtube_api_key):
     search_url = "https://www.googleapis.com/youtube/v3/search"
     search_params = {
         "part": "snippet",
         "q": query,
         "key": youtube_api_key,
-        "maxResults": 10,
+        "maxResults": 5,
         "type": "video"
     }
 
@@ -32,23 +28,25 @@ def fetch_youtube_videos(query):
         })
     return videos
 
-# ✅ Function to summarize video using OpenAI
+# ✅ Summarize using Hugging Face
 def summarize_video(title, description):
-    prompt = f"Summarize this travel video:\nTitle: {title}\nDescription: {description}"
-    client = openai.OpenAI()
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content
+    text = f"{title}. {description}"
+    if len(text) < 50:
+        return "Too short to summarize."
+    result = summarizer(text, max_length=60, min_length=25, do_sample=False)
+    return result[0]['summary_text']
 
 # ✅ Streamlit UI
 st.title("🌍 Yatra Yogi – Top 10 Travel Videos")
+
+# Load from Streamlit secrets
+youtube_api_key = st.secrets["YOUTUBE_API_KEY"]
+
 query = st.text_input("Enter a destination (e.g., Bali, Ladakh)")
 
 if query:
-    with st.spinner("Fetching and summarizing videos..."):
-        videos = fetch_youtube_videos(query)
+    with st.spinner("🔍 Fetching and summarizing videos..."):
+        videos = fetch_youtube_videos(query, youtube_api_key)
         for video in videos:
             st.subheader(video["title"])
             st.write("📄 Description:", video["description"])
