@@ -35,11 +35,12 @@ def fetch_youtube_videos(query):
 # ✅ Function to summarize video using OpenAI
 def summarize_video(title, description):
     prompt = f"Summarize this travel video:\nTitle: {title}\nDescription: {description}"
-    response = openai.ChatCompletion.create(
+    client = openai.OpenAI()
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}]
     )
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
 # ✅ Streamlit UI
 st.title("🌍 Yatra Yogi – Top 10 Travel Videos")
