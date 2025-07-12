@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 from datetime import datetime, timedelta
 from transformers import pipeline
+import wikipedia
 
 # ✅ Load Hugging Face token from secrets
 HF_TOKEN = st.secrets["HF_TOKEN"]
@@ -17,10 +18,12 @@ summarizer = get_summarizer()
 YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
 # ✅ Streamlit UI
-st.title("🌍 Yatra Yogi – Top 10 Travel Videos")
+st.set_page_config(page_title="Yatra Yogi", page_icon="🌍")
+st.title("🌍 Yatra Yogi – Your AI Travel Buddy")
+
 query = st.text_input("Enter a destination (e.g., Bali, Ladakh, Goa)")
 
-# ✅ Filter videos uploaded in last 6 months and with min 2,000 views
+# ✅ Fetch and filter YouTube videos
 def fetch_filtered_videos(query):
     search_url = "https://www.googleapis.com/youtube/v3/search"
     search_params = {
@@ -70,6 +73,16 @@ def summarize(text):
     result = summarizer(text[:1024], max_length=60, min_length=20, do_sample=False)
     return result[0]['summary_text']
 
+# ✅ Get user city from IP
+def get_user_location():
+    try:
+        res = requests.get("https://ipinfo.io/json")
+        data = res.json()
+        return data.get('city', 'your city')
+    except:
+        return 'your city'
+
+# ✅ If user enters a destination
 if query:
     with st.spinner("📺 Fetching and summarizing top videos..."):
         videos = fetch_filtered_videos(query)
@@ -84,3 +97,55 @@ if query:
                 st.write("📄 Description:", video["description"] or "_No description_")
                 summary = summarize(video["description"])
                 st.success("📝 Summary: " + summary)
+
+    # ✅ Destination Summary (Wikipedia)
+    st.subheader(f"📍 About {query.title()}")
+    try:
+        summary = wikipedia.summary(query, sentences=3)
+    except:
+        summary = f"{query.title()} is a beautiful destination worth visiting!"
+    st.write(summary)
+
+    # ✅ User City and Travel Tips
+    user_city = get_user_location()
+    st.subheader(f"🚗 How to Reach {query.title()} from {user_city}")
+    st.markdown(f"""
+- ✈️ **Flight**: Most cities including {user_city} have direct or connecting flights to {query}.
+- 🚆 **Train**: Check trains from {user_city} to the nearest station.
+- 🚘 **Road**: Reach by car or cab via highways.
+    """)
+
+    # ✅ Booking / Offer Links
+    st.subheader("💸 Book Your Trip")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"[🛫 Flights to {query}](https://www.cleartrip.com/flights)")
+    with col2:
+        st.markdown(f"[🏨 Hotels in {query}](https://www.booking.com/searchresults.html?ss={query})")
+
+    col3, col4 = st.columns(2)
+    with col3:
+        st.markdown(f"[🍛 Food in {query}](https://www.zomato.com/{query.lower()})")
+    with col4:
+        st.markdown(f"[🏄 Activities in {query}](https://www.thrillophilia.com/cities/{query.lower()})")
+
+    # ✅ Itinerary Generator
+    if st.button("🧳 Want a 3-Day Itinerary?"):
+        st.subheader(f"🗓️ Suggested 3-Day Itinerary for {query.title()}")
+        st.markdown(f"""
+**Day 1:**  
+- Arrive at {query}  
+- Explore local market  
+- Sunset at scenic point
+
+**Day 2:**  
+- Visit top attractions  
+- Street food and shopping  
+- Cultural or beach experience
+
+**Day 3:**  
+- Half-day nature walk or museum visit  
+- Souvenir shopping  
+- Return journey
+        """)
