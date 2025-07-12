@@ -1,54 +1,66 @@
 import streamlit as st
 import requests
-from transformers import pipeline
 
-# ✅ Load Hugging Face summarizer pipeline
-summarizer = pipeline("summarization")
+# Load API keys from Streamlit secrets
+YOUTUBE_API_KEY = st.secrets["YOUTUBE_API_KEY"]
 
-# ✅ Function to fetch YouTube videos
-def fetch_youtube_videos(query, youtube_api_key):
+st.title("🌍 Yatra Yogi – Top 10 Travel Videos")
+query = st.text_input("Enter a destination (e.g., Bali, Ladakh)")
+
+def fetch_top_videos(destination):
+    # Step 1: Search recent videos about the destination
     search_url = "https://www.googleapis.com/youtube/v3/search"
     search_params = {
         "part": "snippet",
-        "q": query,
-        "key": youtube_api_key,
-        "maxResults": 5,
-        "type": "video"
+        "q": f"{destination} travel",
+        "key": YOUTUBE_API_KEY,
+        "maxResults": 15,
+        "type": "video",
+        "order": "date"
     }
+    search_response = requests.get(search_url, params=search_params).json()
+    video_items = search_response.get("items", [])
+    video_ids = [item["id"]["videoId"] for item in video_items]
 
-    response = requests.get(search_url, params=search_params)
-    data = response.json()
-    items = data.get("items", [])
+    # Step 2: Get statistics to sort by view count
+    stats_url = "https://www.googleapis.com/youtube/v3/videos"
+    stats_params = {
+        "part": "snippet,statistics",
+        "id": ",".join(video_ids),
+        "key": YOUTUBE_API_KEY
+    }
+    stats_response = requests.get(stats_url, params=stats_params).json()
+    sorted_videos = sorted(
+        stats_response.get("items", []),
+        key=lambda x: int(x["statistics"].get("viewCount", 0)),
+        reverse=True
+    )[:10]
 
+    # Step 3: Format output
     videos = []
-    for item in items:
+    for video in sorted_videos:
+        video_id = video["id"]
+        title = video["snippet"]["title"]
+        description = video["snippet"]["description"]
+        thumbnail = video["snippet"]["thumbnails"]["high"]["url"]
+        views = video["statistics"]["viewCount"]
+        url = f"https://www.youtube.com/watch?v={video_id}"
         videos.append({
-            "title": item["snippet"]["title"],
-            "description": item["snippet"]["description"]
+            "title": title,
+            "description": description,
+            "thumbnail": thumbnail,
+            "views": views,
+            "url": url
         })
     return videos
 
-# ✅ Summarize using Hugging Face
-def summarize_video(title, description):
-    text = f"{title}. {description}"
-    if len(text) < 50:
-        return "Too short to summarize."
-    result = summarizer(text, max_length=60, min_length=25, do_sample=False)
-    return result[0]['summary_text']
-
-# ✅ Streamlit UI
-st.title("🌍 Yatra Yogi – Top 10 Travel Videos")
-
-# Load from Streamlit secrets
-youtube_api_key = st.secrets["YOUTUBE_API_KEY"]
-
-query = st.text_input("Enter a destination (e.g., Bali, Ladakh)")
-
+# Render on UI
 if query:
-    with st.spinner("🔍 Fetching and summarizing videos..."):
-        videos = fetch_youtube_videos(query, youtube_api_key)
-        for video in videos:
-            st.subheader(video["title"])
-            st.write("📄 Description:", video["description"])
-            summary = summarize_video(video["title"], video["description"])
-            st.success("📝 Summary: " + summary)
+    with st.spinner("🔎 Fetching top travel videos..."):
+        videos = fetch_top_videos(query)
+        for v in videos:
+            st.image(v["thumbnail"], width=350)
+            st.markdown(f"### [{v['title']}]({v['url']})")
+            st.write(f"📈 Views: {int(v['views']):,}")
+            st.write("📝 " + v["description"][:300] + "...")
+            st.markdown("---")
